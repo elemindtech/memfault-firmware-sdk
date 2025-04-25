@@ -229,6 +229,9 @@ MEMFAULT_PRINTF_LIKE_FUNC(2, 0) void memfault_vlog_save(eMemfaultPlatformLogLeve
 //! @note This function must not be called from an ISR context.
 void memfault_log_trigger_collection(void);
 
+// Elemind Added on April 25th, 2025
+void memfault_log_untrigger_collection();
+
 //! Check if log component has booted
 //!
 //! @returns true if log component has booted or false if not
@@ -240,6 +243,12 @@ uint32_t memfault_log_get_dropped_count(void);
 
 //! Return the count of lines that have been written to the logging buffer.
 uint32_t memfault_log_get_recorded_count(void);
+
+/*
+ * The following function was added by Elemind on April 25th, 2025 to mirror a similarly named function
+ * "memfault_event_storage_bytes_used(void)" function defined in memfault_log.c.
+ */
+size_t memfault_log_storage_bytes_used(void);
 
 #ifdef __cplusplus
 }

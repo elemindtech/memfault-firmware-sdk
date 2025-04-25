@@ -536,3 +536,20 @@ void memfault_log_reset(void) {
 bool memfault_log_booted(void) {
   return s_memfault_ram_logger.enabled;
 }
+
+
+/*
+ * The following function was added by Elemind on April 25th, 2025 to mirror a similarly named function
+ * "memfault_event_storage_bytes_used(void)" function defined in memfault_log.c.
+ */
+// These getters provide the information that user doesn't have. The user knows the total size
+// of the event storage because they supply it but they need help to get the free/used stats.
+size_t memfault_log_storage_bytes_used(void) {
+  size_t bytes_used;
+
+  memfault_lock();
+  { bytes_used = memfault_circular_buffer_get_read_size(&s_memfault_ram_logger.circ_buffer); }
+  memfault_unlock();
+
+  return bytes_used;
+}

@@ -75,6 +75,13 @@ void memfault_log_trigger_collection(void) {
   memfault_unlock();
 }
 
+// Elemind Added on April 25th, 2025
+void memfault_log_untrigger_collection(){
+  memfault_lock();
+  s_memfault_log_data_source_ctx = (sMfltLogDataSourceCtx){ 0 };
+  memfault_unlock();
+}
+
 bool memfault_log_data_source_has_been_triggered(void) {
   // Note: memfault_lock() is held when this is called by memfault_log
   return s_memfault_log_data_source_ctx.triggered;
