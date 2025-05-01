@@ -14,6 +14,7 @@
 
 #include "memfault/config.h"
 #include "memfault/core/reboot_reason_types.h"
+#include "memfault/core/reboot_tracking.h"
 #include "memfault/panics/platform/coredump.h"
 
 #ifdef __cplusplus
@@ -33,8 +34,8 @@ typedef struct MemfaultCoredumpSaveInfo {
 //! @note A user of the SDK shouldn't need to invoke this directly
 //!
 //! @param sMemfaultCoredumpSaveInfo Architecture specific information to save with the coredump
-//! @return true if the coredump was saved and false if the save failed
-bool memfault_coredump_save(const sMemfaultCoredumpSaveInfo *save_info);
+//! @return The save result
+eMfltCoredumpSaveStatus memfault_coredump_save(const sMemfaultCoredumpSaveInfo *save_info);
 
 //! Handler to be invoked from fault handlers
 //!

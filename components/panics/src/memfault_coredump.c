@@ -426,39 +426,44 @@ static bool prv_write_regions(sMfltCoredumpWriteCtx *write_ctx, const sMfltCored
   return true;
 }
 
-static bool prv_write_coredump_sections(const sMemfaultCoredumpSaveInfo *save_info,
+static eMfltCoredumpSaveStatus prv_write_coredump_sections(const sMemfaultCoredumpSaveInfo *save_info,
                                         bool compute_size_only, size_t *total_size) {
   sMfltCoredumpStorageInfo info = { 0 };
   sMfltCoredumpHeader hdr = { 0 };
+
+  // Store progress as a reboot breadcrumb in case code execution stalls. An event can be generated
+  // to flag the failed coredump save once a reset occurs.
+  memfault_reboot_tracking_mark_coredump_progress(core_dump_progress_started);
 
   // are there some regions for us to save?
   size_t num_regions = save_info->num_regions;
   const sMfltCoredumpRegion *regions = save_info->regions;
   if ((regions == NULL) || (num_regions == 0)) {
     // sanity check that we got something valid from the caller
-    return false;
+    return core_dump_failed_sanity;
   }
 
   if (!compute_size_only) {
     if (!memfault_port_coredump_save_begin() || !memfault_platform_coredump_save_begin()) {
-      return false;
+      return core_dump_failed_save_begin;
     }
 
     // If we are saving a new coredump but one is already stored, don't overwrite it. This way
     // the first issue which started the crash loop can be determined
     MfltCoredumpReadCb coredump_read_cb = memfault_platform_coredump_storage_read;
     if (!prv_get_info_and_header(&hdr, &info, coredump_read_cb)) {
-      return false;
+      return core_dump_failed_get_info_header;
     }
 
     if (prv_coredump_header_is_valid(&hdr)) {
-      return false;  // don't overwrite what we got!
+      return core_dump_failed_invalid_header;  // don't overwrite what we got!
     }
   }
 
   // erase storage provided we aren't just computing the size
+  memfault_reboot_tracking_mark_coredump_progress(core_dump_progress_storage_erase);
   if (!compute_size_only && !memfault_platform_coredump_storage_erase(0, info.size)) {
-    return false;
+    return core_dump_failed_storage_erase;
   }
 
   sMfltCoredumpWriteCtx write_ctx = {
@@ -477,10 +482,11 @@ static bool prv_write_coredump_sections(const sMemfaultCoredumpSaveInfo *save_in
   const void *regs = save_info->regs;
   const size_t regs_size = save_info->regs_size;
   if (regs != NULL) {
+    memfault_reboot_tracking_mark_coredump_progress(core_dump_progress_write_non_memory);
 #if MEMFAULT_COREDUMP_CPU_COUNT == 1
     if (!prv_write_non_memory_block(kMfltCoredumpBlockType_CurrentRegisters, regs, regs_size,
                                     &write_ctx)) {
-      return false;
+      return core_dump_failed_write_non_memory;
     }
 #else
     // If we have multiple CPUs, we need to save the registers for each CPU.
@@ -491,22 +497,25 @@ static bool prv_write_coredump_sections(const sMemfaultCoredumpSaveInfo *save_in
 
       if (!prv_write_non_memory_block(kMfltCoredumpBlockType_CurrentRegisters, cpu_regs,
                                       cpu_regs_size, &write_ctx)) {
-        return false;
+        return core_dump_failed_write_non_memory;
       }
     }
 #endif
   }
 
+  memfault_reboot_tracking_mark_coredump_progress(core_dump_progress_write_dev_info);
   if (!prv_write_device_info_blocks(&write_ctx)) {
-    return false;
+    return core_dump_failed_write_dev_info;
   }
 
+  memfault_reboot_tracking_mark_coredump_progress(core_dump_progress_write_trace);
   const uint32_t trace_reason = save_info->trace_reason;
   if (!prv_write_trace_reason(&write_ctx, trace_reason)) {
-    return false;
+    return core_dump_failed_write_trace;
   }
 
   // write out any architecture specific regions
+  memfault_reboot_tracking_mark_coredump_progress(core_dump_progress_write_specific);
   size_t num_arch_regions = 0;
   const sMfltCoredumpRegion *arch_regions = memfault_coredump_get_arch_regions(&num_arch_regions);
   size_t num_sdk_regions = 0;
@@ -517,16 +526,17 @@ static bool prv_write_coredump_sections(const sMemfaultCoredumpSaveInfo *save_in
                                prv_write_regions(&write_ctx, regions, num_regions);
 
   if (!write_completed && write_ctx.write_error) {
-    return false;
+    return core_dump_failed_write_specific;
   }
 
+  memfault_reboot_tracking_mark_coredump_progress(core_dump_progress_write_coredump);
   const sMfltCoredumpFooter footer = (sMfltCoredumpFooter){
     .magic = MEMFAULT_COREDUMP_FOOTER_MAGIC,
     .flags = write_ctx.truncated ? (1 << kMfltCoredumpBlockType_SaveTruncated) : 0,
   };
   write_ctx.storage_size = info.size;
   if (!prv_platform_coredump_write(&footer, sizeof(footer), &write_ctx)) {
-    return false;
+    return core_dump_failed_write_coredump;
   }
 
   const size_t end_offset = write_ctx.offset;
@@ -536,7 +546,7 @@ static bool prv_write_coredump_sections(const sMemfaultCoredumpSaveInfo *save_in
     *total_size = end_offset;
   }
 
-  return success;
+  return core_dump_saved;
 }
 
 MEMFAULT_WEAK bool memfault_platform_coredump_save_begin(void) {
@@ -554,7 +564,7 @@ size_t memfault_coredump_get_save_size(const sMemfaultCoredumpSaveInfo *save_inf
   return total_size;
 }
 
-bool memfault_coredump_save(const sMemfaultCoredumpSaveInfo *save_info) {
+eMfltCoredumpSaveStatus memfault_coredump_save(const sMemfaultCoredumpSaveInfo *save_info) {
   const bool compute_size_only = false;
   size_t total_size = 0;
   return prv_write_coredump_sections(save_info, compute_size_only, &total_size);

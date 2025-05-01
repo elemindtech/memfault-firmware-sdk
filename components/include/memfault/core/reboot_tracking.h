@@ -153,11 +153,36 @@ size_t memfault_reboot_tracking_get_crash_count(void);
 //! Reset the crash count to 0
 void memfault_reboot_tracking_reset_crash_count(void);
 
-//! Flags that a coredump has been collected as part of this reboot
+//! Use as breadcrumbs to track where a coredump save was in it's save sequence in case of failure
+typedef enum
+{
+  core_dump_none =                      0,
+  core_dump_saved =                     1,
+  core_dump_progress_started =          2,
+  core_dump_failed_sanity =             3,
+  core_dump_failed_save_begin =         4,
+  core_dump_failed_get_info_header =    5,
+  core_dump_failed_invalid_header =     6,
+  core_dump_progress_storage_erase =    7,
+  core_dump_failed_storage_erase =      8,
+  core_dump_progress_write_non_memory = 9,
+  core_dump_failed_write_non_memory =   10,
+  core_dump_progress_write_dev_info =   11,
+  core_dump_failed_write_dev_info =     12,
+  core_dump_progress_write_trace =      13,
+  core_dump_failed_write_trace =        14,
+  core_dump_progress_write_specific =   15,
+  core_dump_failed_write_specific =     16,
+  core_dump_progress_write_coredump =   17,
+  core_dump_failed_write_coredump =     18
+} eMfltCoredumpSaveStatus;
+
+//! Saves the progress of the coredump as it is saved for use upon reboot
 //!
+//! @param res This is breadcrumb for tracking coredump save progress in unlikely event of failure
 //! @note This is called by the "panics" component coredump integration automatically and should
 //! never need to be called by an end user directly
-void memfault_reboot_tracking_mark_coredump_saved(void);
+void memfault_reboot_tracking_mark_coredump_progress(eMfltCoredumpSaveStatus res);
 
 //! Get the reported reboot reason from boot
 //!

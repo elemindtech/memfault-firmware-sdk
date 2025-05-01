@@ -92,7 +92,7 @@ static bool prv_read_reset_info(sMfltResetReasonInfo *info) {
     .pc = s_mflt_reboot_info->pc,
     .lr = s_mflt_reboot_info->lr,
     .reset_reason_reg0 = s_mflt_reboot_info->reset_reason_reg0,
-    .coredump_saved = s_mflt_reboot_info->coredump_saved == 1,
+    .coredump_saved = s_mflt_reboot_info->coredump == core_dump_saved,
   };
 
   return true;
@@ -241,18 +241,24 @@ void memfault_reboot_tracking_clear_reset_info(void) {
   }
 
   s_mflt_reboot_info->last_reboot_reason = MEMFAULT_REBOOT_REASON_NOT_SET;
-  s_mflt_reboot_info->coredump_saved = 0;
+  s_mflt_reboot_info->coredump = core_dump_none;
   s_mflt_reboot_info->pc = 0;
   s_mflt_reboot_info->lr = 0;
   s_mflt_reboot_info->reset_reason_reg0 = 0;
+
+  // also clear the info in backup memory
+  memfault_reboot_tracking_save((const sMemfaultRebootTrackingStorage *)s_mflt_reboot_info);
 }
 
-void memfault_reboot_tracking_mark_coredump_saved(void) {
+void memfault_reboot_tracking_mark_coredump_progress(eMfltCoredumpSaveStatus stat) {
   if (!prv_check_or_init_struct()) {
     return;
   }
 
-  s_mflt_reboot_info->coredump_saved = 1;
+  s_mflt_reboot_info->coredump = stat;
+
+  // save coredump progress update to backup memory
+  memfault_reboot_tracking_save((const sMemfaultRebootTrackingStorage *)s_mflt_reboot_info);
 }
 
 int memfault_reboot_tracking_get_reboot_reason(sMfltRebootReason *reboot_reason) {

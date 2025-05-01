@@ -169,10 +169,8 @@ MEMFAULT_USED void memfault_fault_handler(const sMfltRegState *regs, eMemfaultRe
   };
   save_info.regions = memfault_platform_coredump_get_regions(&info, &save_info.num_regions);
 
-  const bool coredump_saved = memfault_coredump_save(&save_info);
-  if (coredump_saved) {
-    memfault_reboot_tracking_mark_coredump_saved();
-  }
+  const eMfltCoredumpSaveStatus coredump_res = memfault_coredump_save(&save_info);
+  memfault_reboot_tracking_mark_coredump_progress(coredump_res);
 
   #if !MEMFAULT_FAULT_HANDLER_RETURN
   memfault_platform_reboot();

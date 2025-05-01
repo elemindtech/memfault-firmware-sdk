@@ -27,7 +27,7 @@ typedef MEMFAULT_PACKED_STRUCT MfltRebootInfo {
   //! without any crash data being read out via the Memfault packetizer
   uint8_t crash_count;
   uint8_t rsvd1[1];
-  uint8_t coredump_saved;
+  eMfltCoredumpSaveStatus coredump: 8;
   uint32_t last_reboot_reason;  // eMemfaultRebootReason or MEMFAULT_REBOOT_REASON_NOT_SET
   uint32_t pc;
   uint32_t lr;
